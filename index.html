@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HIDDEN GEM | Interactive Workflow Explorer</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+:root{--bg:#0b1020;--panel:#121a2e;--panel2:#17223b;--line:#263653;--text:#edf3ff;--muted:#9eacc6;--cyan:#5eead4;--blue:#7aa2ff;--gold:#f6c96b;--pink:#f39ac7}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 15% 0%,#17294b 0,transparent 32%),var(--bg);color:var(--text);font:15px/1.5 Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif}
+header{padding:34px max(22px,calc((100vw - 1180px)/2)) 24px;border-bottom:1px solid var(--line)}
+.eyebrow{color:var(--cyan);font-size:12px;letter-spacing:.16em;font-weight:800;text-transform:uppercase}
+h1{font-size:clamp(30px,5vw,48px);line-height:1.04;margin:10px 0 12px;letter-spacing:-.04em}
+header p{max-width:780px;color:var(--muted);margin:0}
+main{max-width:1180px;margin:26px auto;padding:0 22px 60px}
+.notice{border:1px solid #806a36;background:#2a2417;color:#f7e5b6;padding:13px 16px;border-radius:12px;margin-bottom:20px}
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:13px;margin:18px 0 24px}
+.metric,.panel{background:linear-gradient(145deg,var(--panel),#10182a);border:1px solid var(--line);border-radius:16px}
+.metric{padding:17px}.metric strong{display:block;font-size:27px;letter-spacing:-.03em}.metric span{color:var(--muted);font-size:12px}
+.layout{display:grid;grid-template-columns:1.05fr .95fr;gap:16px}
+.panel{padding:20px;margin-bottom:16px}.panel h2{font-size:18px;margin:0 0 5px}.sub{color:var(--muted);font-size:13px;margin:0 0 16px}
+.workflow{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stage{border:1px solid var(--line);border-radius:12px;padding:13px;background:var(--panel2);text-align:left;color:var(--text);cursor:pointer;transition:.15s}
+.stage:hover,.stage.active{border-color:var(--cyan);background:#18313c}.stage b{display:block;margin-bottom:4px}.stage small{color:var(--muted)}
+.stage .num{color:var(--cyan);font-size:11px;letter-spacing:.12em}
+#stageDetail{background:#0d1728;border:1px solid var(--line);border-radius:12px;padding:15px;margin-top:12px;color:var(--muted)}
+#stageDetail h3{color:var(--text);margin:0 0 6px;font-size:16px}
+canvas{max-height:280px}
+.controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:12px 0}
+input,select,button{font:inherit}input[type=file],select{background:#0c1425;color:var(--text);border:1px solid var(--line);border-radius:9px;padding:9px}
+button.action{background:var(--cyan);color:#09201e;border:0;border-radius:9px;padding:10px 14px;font-weight:800;cursor:pointer}
+button.secondary{background:#1d2a45;color:var(--text);border:1px solid var(--line);border-radius:9px;padding:9px 12px;cursor:pointer}
+.status{font-size:13px;color:var(--muted);margin-top:8px}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;padding:10px;border-bottom:1px solid var(--line)}th{color:var(--muted);font-weight:600}
+.tag{display:inline-block;border:1px solid var(--line);padding:3px 8px;border-radius:99px;color:var(--cyan);font-size:11px}
+.footer{color:var(--muted);font-size:12px;border-top:1px solid var(--line);padding-top:16px;margin-top:16px}
+@media(max-width:850px){.layout{grid-template-columns:1fr}.metrics{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:480px){.metrics{grid-template-columns:1fr 1fr}.workflow{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+<div class="eyebrow">Interactive research dashboard · educational visualization</div>
+<h1>HIDDEN GEM<br><span style="color:var(--cyan)">Workflow Explorer</span></h1>
+<p>Explore the computational stages and published, study-level metrics from Popov et al. (2024). This dashboard visualizes the paper's reported process; it does not run docking, generation, or virtual screening.</p>
+</header>
+<main>
+<div class="notice"><b>Data integrity:</b> Published study facts are shown below. No per-compound records or candidate rankings are included. Target-level enrichment charts remain empty until you upload a CSV containing aggregate values transcribed from the paper or its supplementary tables.</div>
+<section class="metrics">
+<div class="metric"><strong>16</strong><span>protein targets studied</span></div>
+<div class="metric"><strong>~37B</strong><span>library size described in paper</span></div>
+<div class="metric"><strong>~72</strong><span>GPU-hours for model pre-training</span></div>
+<div class="metric"><strong>95%</strong><span>valid generated strings in reported test</span></div>
+</section>
+<div class="layout">
+<div>
+<section class="panel">
+<h2>Workflow map</h2><p class="sub">Select a stage to inspect its role in the published workflow.</p>
+<div class="workflow" id="workflow">
+<button class="stage active" data-stage="0"><span class="num">STAGE 01</span><b>Initial docking</b><small>Score an initial screening set</small></button>
+<button class="stage" data-stage="1"><span class="num">STAGE 02</span><b>Generative modeling</b><small>Fine-tune and generate</small></button>
+<button class="stage" data-stage="2"><span class="num">STAGE 03</span><b>Model filtering</b><small>Apply classifier-based filter</small></button>
+<button class="stage" data-stage="3"><span class="num">STAGE 04</span><b>Similarity search</b><small>Search a large library</small></button>
+<button class="stage" data-stage="4"><span class="num">STAGE 05</span><b>Final docking</b><small>Evaluate selected output</small></button>
+<button class="stage" data-stage="5"><span class="num">STAGE 06</span><b>Enrichment analysis</b><small>Compare against random control</small></button>
+</div>
+<div id="stageDetail"><h3>Initial docking</h3><p>The workflow begins by docking an initial screening library against the selected protein target. The paper reports using different docking software for one target versus the others.</p></div>
+</section>
+<section class="panel">
+<h2>Reported computational facts</h2><p class="sub">Values below are reported in the article, not recalculated by this dashboard.</p>
+<canvas id="factsChart" aria-label="Chart of reported computational facts"></canvas>
+</section>
+</div>
+<div>
+<section class="panel">
+<h2>Target-level enrichment explorer</h2><p class="sub">Load an aggregate CSV to compare reported EF1000 values across targets. This dashboard does not infer missing values.</p>
+<div class="controls">
+<input id="csvFile" type="file" accept=".csv">
+<button class="secondary" id="resetBtn">Reset chart</button>
+</div>
+<canvas id="targetChart" aria-label="Target level enrichment chart"></canvas>
+<div class="status" id="csvStatus">No target-level dataset loaded. Add aggregate values using the template in data/target_enrichment_template.csv.</div>
+</section>
+<section class="panel">
+<h2>What the published numbers mean</h2>
+<table>
+<tr><th>Measure</th><th>Reported value</th></tr>
+<tr><td>Pre-training corpus</td><td>~1.4 million SMILES</td></tr>
+<tr><td>Valid generated strings</td><td>95% of 10,000</td></tr>
+<tr><td>Valid, novel and unique</td><td>92% of 10,000</td></tr>
+<tr><td>Similarity-search reference set</td><td>100 reference entries</td></tr>
+<tr><td>Similarity-search shortlist size</td><td>100,000 queries</td></tr>
+<tr><td>Similarity-search compute</td><td>~800 CPU cores; ~24 hours</td></tr>
+</table>
+</section>
+<section class="panel">
+<h2>Explore responsibly</h2>
+<p class="sub">The article notes that nominated results were computational predictions and that no experiments were conducted on the nominated results in this study. Enrichment is a computational benchmark, not proof of biological activity.</p>
+<span class="tag">Aggregate data only</span> <span class="tag">No screening execution</span> <span class="tag">No compound-level records</span>
+</section>
+</div>
+</div>
+<div class="footer">
+<b>Source:</b> Popov et al. (2024), “Hit Discovery using Docking ENriched by GEnerative Modeling (HIDDEN GEM): A Novel Computational Workflow for Accelerated Virtual Screening of Ultra-large Chemical Libraries,” Molecular Informatics. <br>
+Dashboard scope: interactive explanation and visualization of published workflow-level and aggregate study information. Chart.js is loaded from a public CDN; an internet connection is needed for charts.
+</div>
+</main>
+<script>
+const stageInfo = [
+["Initial docking","The workflow begins by docking an initial screening library against the selected protein target. The article reports AutoDock Vina for target 4R06 and FRED for the other targets."],
+["Generative modeling","A transformer-based generative model was pre-trained on approximately 1.4 million SMILES strings. For each cycle, the model was fine-tuned using a high-scoring subset from the preceding stage."],
+["Model filtering","The authors trained a random-forest classifier using RDKit fingerprint descriptors. A threshold was selected using a validation set and a positive predictive value target of at least 60%."],
+["Similarity search","The paper describes a similarity-search stage that compares a reference set with a very large library. The reported computation used 800 CPU cores and took approximately 24 hours per reference set."],
+["Final docking","The selected outputs from the computational workflow were docked for scoring. The paper's nominated set was based on docking scores; it did not report experimental validation of those nominations."],
+["Enrichment analysis","Enrichment factor compares the number of high-scoring entries from the method with the number expected in a random sample. It is a computational comparison against a random baseline."]
+];
+document.querySelectorAll(".stage").forEach(btn=>btn.addEventListener("click",()=>{
+ document.querySelectorAll(".stage").forEach(x=>x.classList.remove("active"));btn.classList.add("active");
+ const s=stageInfo[Number(btn.dataset.stage)];document.getElementById("stageDetail").innerHTML=`<h3>${s[0]}</h3><p>${s[1]}</p>`;
+}));
+new Chart(document.getElementById("factsChart"),{type:"bar",data:{labels:["Pre-training corpus (millions)","GPU-hours (pre-training)","CPU cores (similarity search)","Hours (similarity search)"],datasets:[{label:"Reported scale",data:[1.4,72,800,24],backgroundColor:["#5eead4","#7aa2ff","#f6c96b","#f39ac7"],borderRadius:7}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{color:"#9eacc6"},grid:{display:false}},y:{ticks:{color:"#9eacc6"},grid:{color:"#263653"}}}}});
+let targetChart = new Chart(document.getElementById("targetChart"),{type:"bar",data:{labels:[],datasets:[{label:"EF1000 (reported)",data:[],backgroundColor:"#5eead4",borderRadius:6}]},options:{responsive:true,plugins:{legend:{labels:{color:"#edf3ff"}}},scales:{x:{ticks:{color:"#9eacc6"},grid:{display:false}},y:{beginAtZero:true,title:{display:true,text:"EF1000",color:"#9eacc6"},ticks:{color:"#9eacc6"},grid:{color:"#263653"}}}}});
+document.getElementById("csvFile").addEventListener("change",async e=>{
+ const f=e.target.files[0];if(!f)return;
+ const txt=await f.text();const rows=txt.trim().split(/\r?\n/).map(x=>x.split(","));
+ const headers=rows.shift().map(x=>x.trim().toLowerCase());
+ const ti=headers.indexOf("target_id"), ei=headers.indexOf("ef1000");
+ if(ti<0||ei<0){document.getElementById("csvStatus").textContent="CSV needs columns named target_id and ef1000.";return;}
+ const parsed=rows.map(r=>({target:r[ti]?.trim(),ef:Number(r[ei])})).filter(x=>x.target && Number.isFinite(x.ef));
+ targetChart.data.labels=parsed.map(x=>x.target);targetChart.data.datasets[0].data=parsed.map(x=>x.ef);targetChart.update();
+ document.getElementById("csvStatus").textContent=`Loaded ${parsed.length} aggregate target rows from ${f.name}. Values are displayed as supplied; verify them against the source before interpretation.`;
+});
+document.getElementById("resetBtn").addEventListener("click",()=>{
+ targetChart.data.labels=[];targetChart.data.datasets[0].data=[];targetChart.update();
+ document.getElementById("csvFile").value="";
+ document.getElementById("csvStatus").textContent="No target-level dataset loaded. Add aggregate values using the template in data/target_enrichment_template.csv.";
+});
+</script>
+</body></html>
